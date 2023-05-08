@@ -1,0 +1,50 @@
+<html>
+<head></head>
+<body>
+    <script type="text/javascript">
+        function ec(t) {
+			return new TextEncoder().encode(t)
+		}
+		function dc(t) {
+            const txt = new Uint8Array(t)
+			return new TextDecoder('utf-8').decode(txt)
+		}
+        var socket = null;
+        var wsuri = "ws://localhost:9009/ws";
+
+        window.onload = function() {
+
+            console.log("onload");
+
+            socket = new WebSocket(wsuri);
+            socket.binaryType = 'arraybuffer';
+
+            socket.onopen = function() {
+                console.log("connected to " + wsuri);
+            }
+
+            socket.onclose = function(e) {
+                console.log("connection closed (" + e.code + ")");
+            }
+
+            socket.onmessage = function(e) {
+                /* console.log("message received: " + e.data); */
+                console.log("message received: " + dc(e.data));
+            }
+        };
+
+        function send() {
+            var msg = document.getElementById('message').value;
+           /*  socket.send(msg); */
+            socket.send(ec(msg));
+        };
+    </script>
+    <h1>WebSocket Echo Test</h1>
+    <form>
+        <p>
+            Message: <input id="message" type="text" value="Hello, world!">
+        </p>
+    </form>
+    <button onclick="send();">Send Message</button>
+</body>
+</html>

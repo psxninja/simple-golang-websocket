@@ -9,11 +9,6 @@ import (
 	"golang.org/x/net/websocket"
 )
 
-type Session struct {
-	Uuid string
-	Conn *websocket.Conn
-}
-
 type Server struct {
 	rwmutex           sync.RWMutex
 	conns             map[*Session]bool
@@ -23,7 +18,18 @@ type Server struct {
 	errorHandler      func(*Session, error)
 }
 
-func (s *Session) Set(key string, val interface{}) {
+type Session struct {
+	Uuid string
+	Conn *websocket.Conn
+}
+
+func (s *Session) Write(msg []byte) (n int, err error) {
+	nn, errr := s.Conn.Write(msg)
+	return nn, errr
+}
+
+func (s *Session) CloseWithStatus(code int) {
+	s.Conn.WriteClose(code)
 }
 
 func New() *Server {
@@ -67,10 +73,10 @@ func (s *Server) HandleRequest(ws *websocket.Conn) {
 }
 
 func (s *Server) Close(ss *Session) {
-	s.disconnectHandler(ss)
 	s.rwmutex.Lock()
+	defer s.rwmutex.Unlock()
+	s.disconnectHandler(ss)
 	delete(s.conns, ss)
-	s.rwmutex.Unlock()
 }
 
 func (s *Server) readLoop(ss *Session) {
@@ -87,18 +93,9 @@ func (s *Server) readLoop(ss *Session) {
 	}
 }
 
-func (s *Server) WriteClose(ss *Session, code int) {
-	ss.Conn.WriteClose(code)
-}
-
-func (s *Server) Write(ss *Session, msg []byte) (n int, err error) {
-	nn, errr := ss.Conn.Write(msg)
-	return nn, errr
-}
-
 func (s *Server) BroadcastOthers(ss *Session, b []byte) {
-	for ws := range s.conns {
-		if ws.Uuid == ss.Uuid {
+	for c := range s.conns {
+		if c.Uuid == ss.Uuid {
 			continue
 		}
 		go func(ws *Session) {
@@ -107,16 +104,17 @@ func (s *Server) BroadcastOthers(ss *Session, b []byte) {
 				fmt.Println("write error")
 				return
 			}
-		}(ws)
+		}(c)
 	}
 }
 
 func (s *Server) guuid(length int) string {
 	rand.Seed(time.Now().UnixNano())
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	chatsetLen := len(charset)
 	b := make([]byte, length)
 	for i := range b {
-		b[i] = charset[rand.Intn(len(charset))]
+		b[i] = charset[rand.Intn(chatsetLen)]
 	}
 	return string(b)
 }
